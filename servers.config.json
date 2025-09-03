@@ -1,0 +1,11 @@
+{
+  "servers": [
+    {
+      "name": "movie_server",
+      "transport": "stdio",
+      "command": "python",
+      "args": ["mcp_servers/movies/movie_server.py"],
+      "env": {}
+    }
+  ]
+}
