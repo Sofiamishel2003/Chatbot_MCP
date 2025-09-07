@@ -57,8 +57,11 @@ def _list_dir(params: ListDirParams) -> List[Dict[str, Any]]:
     if not base.exists():
         return []
     if params.glob:
-        pattern = str(base / params.glob)
-        paths = [Path(p) for p in glob.glob(pattern, recursive=False)]
+        pattern = str((base / params.glob).as_posix())
+        paths = [Path(p) for p in glob.glob(
+            pattern,
+            recursive=(params.recursive or ('**' in params.glob))
+        )]
     elif params.recursive:
         paths = [p for p in base.rglob("*")]
     else:
