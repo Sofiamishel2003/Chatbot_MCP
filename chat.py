@@ -266,23 +266,32 @@ class ChatApp:
 
         # Guardar assistant (puede traer texto + tool_use)
         self.messages.append({"role": "assistant", "content": resp.content})
-
         tool_uses = [c for c in resp.content if getattr(c, "type", "") == "tool_use"]
         if tool_uses:
             tool_results = []
+            confirmations = []  # guardar confirmaciones para afirmar en el mensaje final
             for tu in tool_uses:
                 name = tu.name
                 args = tu.input or {}
                 self.logger.write("llm.tool_use", {"name": name, "args": args})
                 # Ejecutar herramienta en MCP
                 result = await self.host.call_tool(name, args)
+                # Confirmación legible
+                confirm = [
+                    f"**✅ Tool executed**",
+                    f"- server: `{result['server']}`",
+                    f"- tool: `{result['tool']}`",
+                ]
+
+                confirmations.append("\n".join(confirm))
+
                 # Devolvemos tool_result al LLM
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tu.id,
                     "content": json.dumps(result, ensure_ascii=False)
                 })
-            # 2) Segunda vuelta: enviar tool_result como mensaje del rol user
+            # 2) Segunda vuelta: enviar tool_result
             self.messages.append({"role": "user", "content": tool_results})
             resp2 = self.client.messages.create(
                 model=self.model,
@@ -293,8 +302,8 @@ class ChatApp:
             final_text = "".join([c.text for c in resp2.content if getattr(c, "type", "") == "text"])
             self.messages.append({"role": "assistant", "content": resp2.content})
             self.logger.write("llm.final_response", {"text": final_text})
-            return final_text
-
+            # DEVUELVE confirmaciones + respuesta del LLM
+            return "\n\n".join(confirmations + [final_text])
         # Si no usó herramientas, devolver texto directo
         direct_text = "".join([c.text for c in resp.content if getattr(c, "type", "") == "text"])
         self.logger.write("llm.direct_response", {"text": direct_text})
