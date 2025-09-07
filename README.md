@@ -1,70 +1,111 @@
-# Console Chatbot Host (Multi‑MCP, Context, Logging)
+# Console + Web Chatbot Host (Multi-MCP, Context, Logging)
 
-Natural‑language **console chatbot** that connects to **multiple MCP servers** over STDIO and uses an **LLM API** to understand user intent, call tools, and answer in plain English/Spanish. It **keeps conversational context** and **logs every MCP interaction** (requests & responses) to a JSONL file.
+Natural-language **chatbot host** that connects to **multiple MCP servers** (Filesystem, Git, Movies, and a **remote Zodiac** server) and uses an **LLM API** (Anthropic by default) to decide when to call tools. It **keeps conversational context**, exposes every tool with safe names, and **logs all MCP traffic** to a JSONL file. A **Streamlit UI** is included so you can use the bot in the browser—no more console only.
 
-> Designed for class requirements:  
-> - Maintain and show a **log** of all interactions with MCP servers.  
-> - Maintain **context** in a session (e.g., “Who was Alan Turing?” → “In what year was he born?”).  
-> - Use **natural language**; the host decides when to call MCP tools.  
-> - Support **more than one** MCP server (the movies server and others).
+> Built to match the course brief (connect to an LLM API, keep context, log all MCP interactions, use official MCP servers, add a non-trivial local server, add a remote server, and provide clear docs).&#x20;
 
 ---
 
-## 1) Features
-- 🧠 **LLM‑driven chat** (Anthropic by default; OpenAI optional if you adapt `llm_client.py`).
-- 🧰 **Multi‑MCP**: loads N servers from `servers.config.json` and namespaces tools.
-- 🔗 **Tool calling**: the LLM decides when to call a tool; the host executes it and converts JSON to natural‑language answers.
-- 🧾 **Full logging**: writes **every** MCP interaction to `logs/mcp_log.jsonl` (connect, list_tools, call_tool.request, call_tool.response, and LLM tool_use/final_response).
-- 💬 **Session context**: keeps message history so follow‑ups refer to prior topics.
-- 🧩 **Safe tool names**: tools are exposed as `server__tool` (no dots) to comply with provider regex rules.
+## Highlights
+
+* 🧠 **LLM-driven** tool-calling (Anthropic Claude; model configurable).
+* 🧰 **Multi-MCP**: local servers (Filesystem, Git, Movies) + remote Zodiac via HTTP.
+* 🏷️ **Namespaced tools** as `server__tool` (safe for provider regexes).
+* 🧾 **Complete logging** to `logs/mcp_log.jsonl` (connect, list\_tools, requests, responses, LLM steps).
+* 💬 **Contextful chat** (follow-ups just work).
+* 🖥️ **Streamlit UI**: rich chat interface with server status and log panel.
+* 🧪 **Ready-made prompts** to verify each server end-to-end.
 
 ---
 
-## 2) Repository layout (relevant files)
+## Architecture (host / clients / servers)
+
+* **Host (this app)**: coordinates the conversation with the LLM and dispatches tool calls.
+* **Clients**: small adapters in the host (STDIO and HTTP shim) to speak MCP to each server.
+* **Servers**: tools you can call (local or remote). We include:
+
+  * `filesystem` (local STDIO) – safe file ops for the project sandbox.
+  * `git_server` (local STDIO) – basic Git workflow (init, add, commit, branch, log, etc.).
+  * `movie_server` (local STDIO) – non-trivial analysis over datasets (search, recommend, similar, playlists).
+  * `zodiac_remote` (**remote HTTP**) – returns the zodiac sign for a birthdate.
+
+---
+
+## Repository Layout
+
 ```
 project-root/
-├─ chat.py                # ← console chatbot host (entry point)
-├─ mcp_logger.py          # ← JSONL logger used by the host
-├─ servers.config.json    # ← list of MCP servers to launch via STDIO
-├─ mcp_servers/
-│  └─ movies/             # your Movie MCP server lives here
-│     ├─ movie_server.py  # exposes tools like search_movie, recommend_movies_tool, etc.
-│     └─ datasets/        # movies_metadata.csv, keywords.csv (credits.csv optional)
-└─ logs/
-   └─ mcp_log.jsonl       # created at runtime
+├─ app_streamlit.py          # ← Streamlit UI
+├─ chat.py                   # ← console chatbot (entry point)
+├─ mcp_logger.py             # ← JSONL logger helper
+├─ servers.config.json       # ← list of MCP servers to load
+├─ .env                      # ← API keys and config (see below)
+├─ logs/
+│  └─ mcp_log.jsonl          # runtime log (created automatically)
+└─ mcp_servers/
+   ├─ filesystem/
+   │  ├─ filesystem_server.py
+   │  ├─ filesystem_sources.py
+   │  └─ filesystem_models.py
+   ├─ git/
+   │  └─ git_server.py
+   └─ movies/
+      ├─ movie_server.py
+      ├─ movie_sources.py
+      ├─ requirements_movies.txt
+      └─ datasets/
+         ├─ movies_metadata.csv
+         └─ keywords.csv
 ```
-
-> The host is **generic**: it will work with your movies server and any other MCP servers listed in `servers.config.json`.
 
 ---
 
-## 3) Installation
+## Requirements
 
-### Prerequisites
-- **Python 3.10+**
-- A valid **LLM API key** (Anthropic recommended).
+* **Python 3.10+**
+* **pip** (or uv) and a working virtual environment
+* **Anthropic API key** 
 
-### Setup
-```powershell
-# Windows PowerShell inside your venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-pip install mcp[cli] anthropic rich python-dotenv
-```
-
-Create a `.env` file next to `chat.py` with your key:
-```
-ANTHROPIC_API_KEY=sk-ant-xxxxxxx
-```
-
-> `chat.py` loads `.env` automatically (via `python-dotenv`).
 ---
 
-## 4) Configure MCP servers
+## Setup
 
-Edit **`servers.config.json`** to include all servers you need. Example:
+```bash
+# 1) Create and activate a venv (Windows PowerShell)
+python -m venv .venv
+. .\.venv\Scripts\Activate.ps1
+
+# 2) Install core deps
+pip install -r requirements.txt
+
+# 3) Put your key in .env (next to chat.py)
+# Example:
+# ANTHROPIC_API_KEY=sk-ant-xxxx
+```
+
+> The host loads `.env` automatically.
+
+---
+
+## Configure MCP Servers
+
+Open **`servers.config.json`** and list each server. The project already includes a working example—here is the structure to adapt:
+
 ```json
 {
   "servers": [
+    {
+      "name": "filesystem",
+      "command": "python",
+      "args": ["mcp_servers/filesystem/filesystem_server.py", "stdio"],
+      "env": {}
+    },
+    {
+      "name": "git_server",
+      "command": "python",
+      "args": ["mcp_servers/git/git_server.py", "stdio"],
+      "env": {}
+    },
     {
       "name": "movie_server",
       "command": "python",
@@ -72,98 +113,151 @@ Edit **`servers.config.json`** to include all servers you need. Example:
       "env": {}
     },
     {
-      "name": "fs",
-      "command": "uvx",
-      "args": ["mcp", "run", "filesystem"],
-      "env": {}
+      "name": "zodiac_remote",
+      "transport": "shim",
+      "url": "https://<your-cloud-run-host>/mcp",
+      "headers": { "Accept": "application/json" }
     }
   ]
 }
 ```
 
-- `name`: logical server name (letters/numbers/underscore/hyphen).  
-- `command` and `args`: how to start the MCP server via **STDIO**.  
-- `env`: optional environment variables (e.g., dataset paths).
+**Transports supported by the host:**
 
-> The host will **namespace** tools as `movie_server__search_movie`, `fs__read`, etc.
+* `stdio` → for local servers you run as child processes.
+* `shim` → **HTTP JSON-RPC** to a single `/mcp` endpoint (stateless requests). Use this when a remote server doesn’t expose the full `streamable-http` session but *does* accept JSON-RPC POSTs to `/mcp`.
 
 ---
 
-## 5) Run the console host
+## Run
 
-```powershell
+### Console
+
+```bash
 python chat.py
 ```
-You should see:
+
+You’ll see:
+
 ```
 Chatbot MCP ready. Type /help for commands.
 ```
 
-### Built‑in commands
-- `/servers` — list connected servers.  
-- `/tools <server>` — list tools from one server.  
-- `/logpath` — show the log file path.  
-- `/history` — show message count in session.  
-- `/clear` — clear conversation context.  
-- `/help` — show this help.
+**Helpful commands**
 
+* `/servers` – list connected servers
+* `/tools <server>` – list tools for a server
+* `/logpath` – show the JSONL log file
+* `/history` – message count in session
+* `/clear` – clear conversation context
+* `/help` – show help
+
+### Web UI (Streamlit)
+
+```bash
+streamlit run app_streamlit.py
+```
+
+Then open the local URL shown by Streamlit. The UI includes:
+
+* Chat area (assistant messages + tool results summarized nicely)
+* Sidebar with connected servers and tools
+* Real-time **tail** of `logs/mcp_log.jsonl` for debugging
+![alt text](image.png)
 ---
 
-## 6) What to expect (flow)
+## How It Works (tool-calling loop)
 
-1. You ask in **natural language**.  
-2. The LLM may return `tool_use` calls.  
-3. The host executes `server__tool` on the correct MCP server and appends `tool_result`.  
-4. The LLM then produces a **final natural‑language answer** for you.  
-5. All MCP steps are **logged** to `logs/mcp_log.jsonl`.
+1. You ask in **natural language**.
+2. The LLM may return one or more `tool_use` blocks.
+3. The host dispatches each `server__tool` with the given arguments.
+4. Tool results are sent back as `tool_result`, and the LLM produces the final answer.
+5. Every step is recorded to **`logs/mcp_log.jsonl`**.
 
-**Logging format** (JSONL, one event per line):
+**Example log lines (JSONL):**
+
 ```json
-{"ts":"2025-09-03T17:22:44.10Z","event":"connect","payload":{"server":"movie_server","command":"python","args":["..."]}}
-{"ts":"2025-09-03T17:22:44.13Z","event":"list_tools","payload":{"server":"movie_server","tools":["search_movie", "..."]}}
-{"ts":"2025-09-03T17:23:01.55Z","event":"llm.tool_use","payload":{"name":"movie_server__search_movie","args":{"query":"Toy Story","limit":5}}}
-{"ts":"2025-09-03T17:23:01.70Z","event":"call_tool.request","payload":{"server":"movie_server","tool":"search_movie","args":{"query":"Toy Story","limit":5}}}
-{"ts":"2025-09-03T17:23:02.01Z","event":"call_tool.response","payload":{"server":"movie_server","tool":"search_movie","structured":{...}}}
-{"ts":"2025-09-03T17:23:02.50Z","event":"llm.final_response","payload":{"text":"Here are the movies..."}}}
+{"ts":"2025-09-07T19:40:01Z","event":"connect","payload":{"server":"filesystem","transport":"stdio"}}
+{"ts":"2025-09-07T19:40:18Z","event":"call_tool.request","payload":{"server":"filesystem","tool":"fs_list_dir","args":{"params":{"path":".","recursive":false}}}}
+{"ts":"2025-09-07T19:40:18Z","event":"call_tool.response","payload":{"server":"filesystem","tool":"fs_list_dir","structured":{...}}}
+{"ts":"2025-09-07T19:40:21Z","event":"llm.final_response","payload":{"text":"Here are the files..."}}
 ```
 
 ---
 
-## 7) Quick test script (context + movies)
+## Verification Prompts (copy & paste)
 
-> Titles/genres are best provided in **English** for MovieLens/TMDB.
+### A) Filesystem
 
-### A) Context only (no tools)
-1. `Who was Alan Turing?`  
-2. `And in what year was he born?`  
-3. `Summarize his main contributions in two lines.`
+* “List files in the project root (non-recursive).”
+* “Open `README.md` and show me the first 500 bytes.”
+* “Create `notes/todo.txt` with the text `hello world`.”
+* “Append `- [ ] add unit tests` to `notes/todo.txt`.”
+* “Move `notes/todo.txt` to `notes/tasks.txt` and show its metadata.”
+* “Find all `TODO` occurrences under `**/*.py` (max 30).”
 
-### B) Movies (should call MCP)
-1. `Search for "Toy Story" and list the title, year and average rating.`  
-2. `Give me more details about the first one.`  
-3. `What year was it released and what's the runtime?`
+### B) Git
 
-### C) Recommendations
-1. `Recommend science fiction movies with rating >= 7.5 from 2000 to 2020. Return 8 items.`  
-2. `Now restrict to English only.`  
-3. `Also include Adventure as a genre.`
+* “Create a repo named `DemoRepo` inside the project.”
+* “Create `DemoRepo/README.md` with `# Demo`, add it and commit with message `init`.”
+* “Create and checkout branch `feature/x`.”
+* “Show `git status` in `DemoRepo`.”
+* “Show the last 5 commits with messages.”
 
-### D) Similar by keywords
-1. `Find 8 movies similar to "The Dark Knight" based on keywords.`  
-2. `From that list, which one has the highest rating?`
+### C) Movies (non-trivial local server)
 
-### E) Playlist by minutes
-1. `Build me an 8-hour watchlist of Drama/Thriller films. Prefer high ratings.`  
-2. `Make it English only.`
+* “Search for ‘Toy Story’ and list title/year/rating.”
+* “Recommend Sci-Fi movies with rating ≥ 7.5 between 2000–2020 (8 items).”
+* “Find 8 movies similar to ‘The Dark Knight’ by keywords.”
 
----
+### D) Remote Zodiac (HTTP)
 
-## 9) Notes & references
-- **MCP Architecture** (how hosts and servers interact): modelcontextprotocol.io/docs/learn/architecture  
-- **MCP Specification** (JSON‑RPC, STDIO framing, tools): modelcontextprotocol.io/specification/2025-06-18  
-- **MCP Servers & SDKs** (reference examples): github.com/modelcontextprotocol/servers
+* “What’s the zodiac sign for birthdate `2001-04-15`?”
+* “Check `1998-11-29` as well.”
+
+> If your Cloud Run service is auth-protected, run the Cloud Run proxy locally, or switch the service to allow unauthenticated requests **only for testing**.
 
 ---
 
-## 10) License
-For class/demo use. Respect original dataset licenses (TMDB/GroupLens/Kaggle) when using the movies server.
+## Troubleshooting
+
+* **“Forbidden/Not Found” on Cloud Run root**
+  Use `/mcp` for JSON-RPC with `Accept: application/json`. The host’s `shim` transport posts directly to that endpoint.
+
+* **“Missing session ID / 400 Not Acceptable”**
+  Those errors happen with `streamable-http` GETs or wrong `Accept` headers. The **shim** transport avoids sessions: pure JSON-RPC POSTs to `/mcp`.
+
+* **Datasets not found (Movies server)**
+  Ensure CSVs are present in `mcp_servers/movies/datasets/`. Large files are ignored by VCS; place them manually if needed.
+
+* **Nothing shows in the UI**
+  Confirm your `.env` has a valid `ANTHROPIC_API_KEY`, then watch `logs/mcp_log.jsonl` for errors.
+
+---
+
+## How this maps to the assignment
+
+* **LLM API connection & session context** — console and web UIs both preserve context; answers can chain references.
+* **Full MCP logging** — every request/response is written to JSONL.
+* **Official servers used** — Filesystem & Git are available and demonstrated.
+* **Non-trivial local server** — Movies server (search, recommend, similarity, playlists) over real datasets.
+* **Remote server** — Zodiac server on Cloud Run, consumed via HTTP shim.
+* **UI extra** — Streamlit web front-end.&#x20;
+
+---
+
+## Configuration Reference
+
+**Environment variables (.env)**
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**servers.config.json fields**
+
+* `name` — logical name used for namespacing.
+* `command` + `args` — how to spawn the server for **stdio**.
+* `transport` — one of: `stdio`, `shim`.
+* `url` — required for `shim` (e.g., `https://…/mcp`).
+* `headers` — optional extra HTTP headers for `shim`.
