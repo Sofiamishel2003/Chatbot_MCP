@@ -18,6 +18,13 @@
       }
     },
     {
+      "name": "git_server",
+      "transport": "stdio",
+      "command": "python",
+      "args": ["mcp_servers/git/git_server.py"],
+      "env": {}
+    },
+    {
       "name": "zodiac_remote",
       "transport": "shim",
       "url": "https://mcp-server-1016234682649.us-central1.run.app/mcp",

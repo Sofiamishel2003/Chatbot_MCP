@@ -25,7 +25,7 @@ async def _run(fn, *args, timeout: Optional[float] = None):
     to = timeout if timeout is not None else FS_TOOL_TIMEOUT
     return await asyncio.wait_for(asyncio.to_thread(fn, *args), timeout=to)
 
-# ---------- Tools ----------
+# Herramientas que resuelven
 @mcp.tool()
 async def fs_list_dir(params: ListDirParams) -> List[Dict[str, Any]]:
     """List directory contents. Supports recursive and glob filters."""
