@@ -36,27 +36,6 @@ uv run python mcp_servers/git_server.py
 
 ---
 
-## Registering the server in your host
-
-Add an entry to your `servers.config.json`:
-
-```json
-{
-  "servers": [
-    {
-      "name": "git_server",
-      "transport": "stdio",
-      "command": "uv",
-      "args": ["run", "python", "mcp_servers/git_server.py"],
-      "env": {}
-    }
-  ]
-}
-```
-
-Then run your host (console chatbot or Streamlit UI). On connect, the host will list tools from `git_server`.
-
----
 
 ## Available Tools & Input Schemas
 
