@@ -6,6 +6,15 @@
       "command": "python",
       "args": ["mcp_servers/movies/movie_server.py"],
       "env": {}
+    },
+    {
+      "name": "zodiac_remote",
+      "transport": "shim",
+      "url": "https://mcp-server-1016234682649.us-central1.run.app/mcp",
+      "headers": {
+        "Accept": "application/json"
+      }
     }
   ]
 }
+
