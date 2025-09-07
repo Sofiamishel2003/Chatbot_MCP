@@ -8,6 +8,16 @@
       "env": {}
     },
     {
+      "name": "filesystem",
+      "transport": "stdio",
+      "command": "python",
+      "args": ["mcp_servers/filesystem/filesystem_server.py"],
+      "env": {
+        "FS_ROOT": "C:/Users/50250/Desktop/Sofía Mishell Velásquez UVG/Cuarto Año 2025/Segundo semestre/Redes/Chatbot_en_consola-",
+        "FS_CWD": "."
+      }
+    },
+    {
       "name": "zodiac_remote",
       "transport": "shim",
       "url": "https://mcp-server-1016234682649.us-central1.run.app/mcp",

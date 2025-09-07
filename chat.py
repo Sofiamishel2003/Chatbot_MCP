@@ -117,6 +117,7 @@ class MCPHost:
         self.sessions: dict[str, ClientSession] = {}
         self._connections = {}
         self.tools_schema: list[dict[str, Any]] = []  # para el LLM
+        self.input_schema_map: dict[str, dict[str, Any]] = {} 
         self.tool_name_map: dict[str, tuple[str, str]] = {}
 
     async def connect_all(self):
@@ -169,17 +170,20 @@ class MCPHost:
     async def _discover_all_tools(self):
         self.tools_schema.clear()
         self.tool_name_map.clear()
+        self.input_schema_map.clear()
         for server, session in self.sessions.items():
             tools = await session.list_tools()
             self.logger.write("list_tools", {"server": server, "tools": [t.name for t in tools.tools]})
             for t in tools.tools:
                 # Nombre seguro para Anthropic (sin '.')
                 safe_name = f"{server}__{t.name}"
+                schema = t.inputSchema or {"type": "object", "properties": {}}                
+                self.input_schema_map[safe_name] = schema
                 self.tool_name_map[safe_name] = (server, t.name)
                 self.tools_schema.append({
                     "name": safe_name,
                     "description": f"[{server}] {t.description or ''}",
-                    "input_schema": t.inputSchema or {"type": "object", "properties": {}}
+                    "input_schema": schema
                 })
 
     async def call_tool(self, namespaced: str, arguments: dict[str, Any]):
@@ -187,9 +191,15 @@ class MCPHost:
             raise ValueError(f"Herramienta '{namespaced}' no registrada. Disponibles: {list(self.tool_name_map.keys())}")
         server, tool = self.tool_name_map[namespaced]
         session = self.sessions[server]
-        self.logger.write("call_tool.request", {"server": server, "tool": tool, "args": arguments})
-        result = await session.call_tool(tool, arguments=arguments)
+        # --- Auto-wrap si el schema espera 'params' ---
+        schema = self.input_schema_map.get(namespaced) or {}
+        props = (schema.get("properties") or {}) if isinstance(schema, dict) else {}
+        tool_args = arguments
+        if "params" in props and "params" not in arguments:
+            tool_args = {"params": arguments}
 
+        self.logger.write("call_tool.request", {"server": server, "tool": tool, "args": tool_args})
+        result = await session.call_tool(tool, arguments=tool_args)
         text_blocks = []
         for c in getattr(result, "content", []) or []:
             # Soporta tanto mcp.Types.TextContent como SimpleNamespace(text=...)
