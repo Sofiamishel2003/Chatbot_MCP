@@ -1,4 +1,4 @@
-# Console + Web Chatbot Host (Multi-MCP, Context, Logging)
+# Console + Web Chatbot Host
 
 Natural-language **chatbot host** that connects to **multiple MCP servers** (Filesystem, Git, Movies, and a **remote Zodiac** server) and uses an **LLM API** (Anthropic by default) to decide when to call tools. It **keeps conversational context**, exposes every tool with safe names, and **logs all MCP traffic** to a JSONL file. A **Streamlit UI** is included so you can use the bot in the browser—no more console only.
 
