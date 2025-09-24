@@ -81,6 +81,9 @@ pip install -r requirements.txt
 # 3) Put your key in .env (next to chat.py)
 # Example:
 # ANTHROPIC_API_KEY=sk-ant-xxxx
+
+# 4) Install if you want the web interface
+pip install streamlit
 ```
 
 > The host loads `.env` automatically.
